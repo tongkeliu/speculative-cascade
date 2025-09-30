@@ -1,4 +1,5 @@
 from modelscope import AutoTokenizer, AutoModelForCausalLM
+from transformers import DynamicCache
 import torch
 from utils import *
 
@@ -19,18 +20,17 @@ model = AutoModelForCausalLM.from_pretrained(
 )
 
 prompt = "who are you?"
-past_key_values = None
+past_key_values = DynamicCache()
 max_length = 256
 generated_tokens = []
 
 for i in range(max_length):
-    if past_key_values == None:
+    if generated_tokens == []:
         input_ids = tokenizer(prompt, return_tensors="pt").to(device)
-        output = model(**input_ids, use_cache=True)
+        output = model(**input_ids, use_cache=True, past_key_values=past_key_values)
     else:
         output = model(input_ids=sampled_token, use_cache=True, past_key_values=past_key_values)
 
-    past_key_values = output.past_key_values
     logits = norm_top_k_top_p_filter(0.7, output.logits[:,-1,:], 20, 0.9)
     sampled_token = torch.multinomial(logits, num_samples=1)
     generated_tokens.append(sampled_token.item())
