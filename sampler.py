@@ -49,7 +49,8 @@ class Sampler():
                                              self.args.top_k, self.args.top_p)
             sampled_token = torch.multinomial(logits, num_samples=1)
             result_ids = torch.cat((result_ids, sampled_token), dim=1)
-        
+
+        past_key_values = None # reset kvcache
         return result_ids
     
     @torch.no_grad()
@@ -91,7 +92,7 @@ class Sampler():
                 tg_prob_history = torch.cat((tg_prob_history, tg_output.logits), dim=1)
 
             for i in range(self.args.gamma):
-                token = result_ids[0][n+i]
+                token = result_ids[0][n+i+1]
                 # reject condition
                 randnum = torch.rand((1, 1), device=self.args.device)
                 if randnum < 1 - tg_prob_history[:,n+i,token] / ap_prob_history[:,n+i,token]:
@@ -100,9 +101,9 @@ class Sampler():
 
                     n = n + i
                     reject_cnt += 1
-                    ap_past_key_values.crop(n + 1)
-                    tg_past_key_values.crop(n + 1)
-                    result_ids = result_ids[:, :n]
+                    ap_past_key_values.crop(n)
+                    tg_past_key_values.crop(n)
+                    result_ids = result_ids[:, :n + 1]
                     ap_prob_history = ap_prob_history[:, :n]
                     tg_prob_history = tg_prob_history[:, :n]
                     break
@@ -111,6 +112,8 @@ class Sampler():
                 n = n + self.args.gamma
                 continue
         
+        ap_past_key_values.reset()
+        tg_past_key_values.reset()
         print("reject_cnt", reject_cnt)
         return result_ids
 
