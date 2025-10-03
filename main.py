@@ -15,17 +15,23 @@ def main(args):
     logger = get_logger(args)
     sampler = Sampler(args)
 
-    set_seed(args.seed)
-    output1 = sampler.autoregressive()
-    logger.info("model answer:{}".format(sampler.tokenizer.decode(output1[0])))
-    set_seed(args.seed)
-    inference_speed(sampler.autoregressive, 1, logger, "autoregressive")
+    # set_seed(args.seed)
+    # output = sampler.autoregressive()
+    # logger.info("model answer:{}".format(sampler.tokenizer.decode(output[0])))
+    # set_seed(args.seed)
+    # inference_speed(sampler.autoregressive, 1, logger, "autoregressive")
+
+    # set_seed(args.seed)
+    # output = sampler.speculative()
+    # logger.info("model answer:{}".format(sampler.tokenizer.decode(output[0])))
+    # set_seed(args.seed)
+    # inference_speed(sampler.speculative, 1, logger, "speculative")
 
     set_seed(args.seed)
-    output2 = sampler.speculative()
-    logger.info("model answer:{}".format(sampler.tokenizer.decode(output2[0])))
+    output = sampler.cascade()
+    logger.info("model answer:{}".format(sampler.tokenizer.decode(output[0])))
     set_seed(args.seed)
-    inference_speed(sampler.speculative, 1, logger, "speculative")
+    inference_speed(sampler.cascade, 1, logger, f"cascade-{args.deferral_rule}")
 
 if __name__ == "__main__":
     args = args_parser()

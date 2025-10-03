@@ -117,8 +117,46 @@ class Sampler():
         print("reject_cnt", reject_cnt)
         return result_ids
 
+    @torch.no_grad()
     def cascade(self):
-        pass
+        ap_past_key_values = DynamicCache()
+        tg_past_key_values = DynamicCache()
+        ap_input_ids = self.tokenizer(self.args.prompt, return_tensors="pt")["input_ids"].to(self.args.device)
+        result_ids = ap_input_ids
+        switch_cnt = 0
+        for i in range(self.args.max_length):
+            if ap_past_key_values.get_seq_length() == 0:
+                ap_output = self.approx_model(input_ids=ap_input_ids, use_cache=True, 
+                                                past_key_values=ap_past_key_values)
+            else:
+                ap_output = self.approx_model(input_ids=sampled_token, use_cache=True, 
+                                                past_key_values=ap_past_key_values)
+            output = ap_output
+            # we don't implement oracle rule here
+            r = deferral_rule(self.args.deferral_rule, ap_output.logits[:, -1, :],
+                             None, self.args.alpha)
+            if r == 1:
+                # switch to target model
+                if tg_past_key_values.get_seq_length() == 0:
+                    tg_output = self.target_model(input_ids=result_ids, use_cache=True, 
+                                                past_key_values=tg_past_key_values)
+                else:                
+                    tg_output = self.target_model(
+                        input_ids=result_ids[:,tg_past_key_values.get_seq_length():], 
+                        use_cache=True, 
+                        past_key_values=tg_past_key_values
+                    )
+                output = tg_output
+                switch_cnt += 1
+            logits = norm_top_k_top_p_filter(self.args.temperature, output.logits[:,-1,:],\
+                                                self.args.top_k, self.args.top_p)
+            sampled_token = torch.multinomial(logits, num_samples=1)
+            result_ids = torch.cat((result_ids, sampled_token), dim=1)
+
+        ap_past_key_values.reset()
+        tg_past_key_values.reset()
+        print("switch_cnt", switch_cnt)
+        return result_ids
 
     def spec_cascade(self):
         pass
